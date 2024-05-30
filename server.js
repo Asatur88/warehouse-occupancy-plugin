@@ -1,45 +1,31 @@
 const express = require('express');
 const { google } = require('googleapis');
-const keys = require('./keys.json');
+const keys = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
 
-const client = new google.auth.JWT(
-    keys.client_email,
-    null,
-    keys.private_key,
-    ['https://www.googleapis.com/auth/spreadsheets.readonly']
-);
-
-client.authorize((err, tokens) => {
-    if (err) {
-        console.log('Error connecting to Google Sheets API:', err);
-        return;
-    }
-    console.log('Connected to Google Sheets API');
+const auth = new google.auth.GoogleAuth({
+  credentials: keys,
+  scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
 });
 
-const sheets = google.sheets({ version: 'v4', auth: client });
+const sheets = google.sheets({ version: 'v4', auth });
 
-app.get('/api/occupancy', async (req, res) => {
-    try {
-        const spreadsheetId = '197m6mi1R-rM-iUZgGLPY8xHKOvUOhKyEWMTkGH0RV7A'; // замените на ваш ID таблицы
-        const range = 'Лист1!A2'; // замените на ваш диапазон данных
-        const response = await sheets.spreadsheets.values.get({
-            spreadsheetId: spreadsheetId,
-            range: range,
-        });
-        const occupancyCount = response.data.values[0][0];
-        res.json({ count: occupancyCount });
-    } catch (error) {
-        console.error('Error fetching data from Google Sheets:', error);
-        res.status(500).send('Internal Server Error');
-    }
+app.get('/data', async (req, res) => {
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: '197m6mi1R-rM-iUZgGLPY8xHKOvUOhKyEWMTkGH0RV7A',
+      range: 'Лист1!A2',
+    });
+
+    res.send(response.data.values);
+  } catch (error) {
+    console.error('Error retrieving data:', error);
+    res.status(500).send('Error retrieving data');
+  }
 });
 
-app.use(express.static('dist'));
-
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
 });
